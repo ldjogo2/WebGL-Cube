@@ -1,4 +1,4 @@
-# STILL WORK IN PROGRESS
+# STILL WORK IN PROGRESS, Adding Interactive Mouse functionality to spin and move cube!!!
 
 # WebGL-Cube
 Toy program to render a cube using a perspective projection
