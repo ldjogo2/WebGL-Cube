@@ -1,260 +1,10 @@
 import vertexShaderSrc from './vertex.glsl.js';
 import fragmentShaderSrc from './fragment.glsl.js';
 
-var gl;
-var program;
-var vao;
-var modelLoc;
-var projLoc;
-var viewLoc;
-var modelMatrix;
-var projMatrix;
-var viewMatrix;
-var buffers;
-var dragging = null;
-var anglex = 0;
-var angley = 0;
 
-window.mousemove = function (event) {
-    var deltax, deltay;
 
-    // console.log(event.clientX, event.clientY, event.which);
-    if (dragging) {
-        deltax = event.clientX - dragging.clientX;
-        deltay = -(event.clientY - dragging.clientY);
-        console.log("moved: " + deltax + " " + deltay);
 
-        anglex += deltay;
-        angley -= deltax;
-
-        dragging = event;
-        event.preventDefault();
-    }
-};
-
-self.mousedown = function (event) {
-    console.log(event.clientX, event.clientY);
-    dragging = event;
-    event.preventDefault();
-};
-
-self.mouseup = function(event) {
-    dragging = null;
-}
-
-function createCube() {
-
-    var positions = [
-        // Front face
-        -1.0, -1.0, 1.0,
-        1.0, -1.0, 1.0,
-        1.0, 1.0, 1.0,
-        -1.0, 1.0, 1.0,
-
-        // Back face
-        -1.0, -1.0, -1.0,
-        -1.0, 1.0, -1.0,
-        1.0, 1.0, -1.0,
-        1.0, -1.0, -1.0,
-
-        // Top face
-        -1.0, 1.0, -1.0,
-        -1.0, 1.0, 1.0,
-        1.0, 1.0, 1.0,
-        1.0, 1.0, -1.0,
-
-        // Bottom face
-        -1.0, -1.0, -1.0,
-        1.0, -1.0, -1.0,
-        1.0, -1.0, 1.0,
-        -1.0, -1.0, 1.0,
-
-        // Right face
-        1.0, -1.0, -1.0,
-        1.0, 1.0, -1.0,
-        1.0, 1.0, 1.0,
-        1.0, -1.0, 1.0,
-
-        // Left face
-        -1.0, -1.0, -1.0,
-        -1.0, -1.0, 1.0,
-        -1.0, 1.0, 1.0,
-        -1.0, 1.0, -1.0
-    ];
-
-    var colorsOfFaces = [
-        [0.3, 1.0, 1.0, 1.0],    // Front face: cyan
-        [1.0, 0.3, 0.3, 1.0],    // Back face: red
-        [0.3, 1.0, 0.3, 1.0],    // Top face: green
-        [0.3, 0.3, 1.0, 1.0],    // Bottom face: blue
-        [1.0, 1.0, 0.3, 1.0],    // Right face: yellow
-        [1.0, 0.3, 1.0, 1.0]     // Left face: purple
-    ];
-
-    var colors = [];
-
-    for (var j = 0; j < 6; j++) {
-        var polygonColor = colorsOfFaces[j];
-
-        for (var i = 0; i < 4; i++) {
-            colors = colors.concat(polygonColor);
-        }
-    }
-
-    var elements = [
-        0, 1, 2, 0, 2, 3,    // front
-        4, 5, 6, 4, 6, 7,    // back
-        8, 9, 10, 8, 10, 11,   // top
-        12, 13, 14, 12, 14, 15,   // bottom
-        16, 17, 18, 16, 18, 19,   // right
-        20, 21, 22, 20, 22, 23    // left
-    ];
-
-    return {
-        positions: positions,
-        colors: colors,
-        elements: elements
-    }
-}
-
-function updateModelMatrix() {
-    var scale = scaleMatrix(0.5, 0.5, 0.5);
-
-    // Rotate a slight tilt
-    var rotateX = rotateXMatrix(0.01*anglex + 45.0 * Math.PI / 180.0);
-
-    // Rotate according to time
-    var rotateY = rotateYMatrix(0.01*angley + -45.0 * Math.PI / 180.0);
-
-    // Move slightly down
-    var position = translateMatrix(0, 0, -50);
-
-    // Multiply together, make sure and read them in opposite order
-    modelMatrix = multiplyArrayOfMatrices([
-        position, // step 4
-        rotateY,  // step 3
-        rotateX,  // step 2
-        scale     // step 1
-    ]);
-}
-
-function updateProjectionMatrix() {
-    var aspect = window.innerWidth / window.innerHeight;
-    projMatrix = perspectiveMatrix(45.0 * Math.PI / 180.0, aspect, 1, 500);
-    // projMatrix = orthographicMatrix(-aspect, aspect, -1, 1, 0, 500);
-}
-
-function updateViewMatrix() {
-    var now = Date.now();
-    var moveInAndOut = 5 - 50.0 * (Math.sin(now * 0.002) + 1.0) / 2.0;
-
-    var position = translateMatrix(0, 0, moveInAndOut);
-    var world2view = multiplyArrayOfMatrices([
-        position
-    ]);
-
-    viewMatrix = invertMatrix(world2view);
-
-}
-
-function createShader(type, source) {
-    var shader = gl.createShader(type);
-    gl.shaderSource(shader, source);
-    gl.compileShader(shader);
-    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-        var info = gl.getShaderInfoLog(shader);
-        console.log('Could not compile WebGL program:' + info);
-    }
-
-    return shader;
-}
-
-function createProgram(vertexShader, fragmentShader) {
-    var program = gl.createProgram();
-
-    gl.attachShader(program, vertexShader);
-    gl.attachShader(program, fragmentShader);
-    gl.linkProgram(program);
-    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-        var info = gl.getProgramInfoLog(program);
-        console.log('Could not compile WebGL program:' + info);
-    }
-
-    return program;
-}
-
-function createBuffers(triangles) {
-    var posBuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, posBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(triangles['positions']), gl.STATIC_DRAW);
-
-    var colorBuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(triangles['colors']), gl.STATIC_DRAW);
-
-    var elemBuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, elemBuffer);
-    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(triangles['elements']), gl.STATIC_DRAW);
-
-    return { 'positions': posBuffer, 'colors': colorBuffer, 'elements': elemBuffer };
-}
-
-function createVAO(posAttribLoc, colorAttribLoc, buffers) {
-
-    var vao = gl.createVertexArray();
-
-    gl.bindVertexArray(vao);
-    gl.enableVertexAttribArray(posAttribLoc);
-    var size = 3; // number of components per attribute
-    var type = gl.FLOAT;
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffers['positions']);
-    gl.vertexAttribPointer(posAttribLoc, size, type, false, 0, 0);
-
-    gl.enableVertexAttribArray(colorAttribLoc);
-    size = 4;
-    type = gl.FLOAT;
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffers['colors']);
-    gl.vertexAttribPointer(colorAttribLoc, size, type, false, 0, 0);
-
-    return vao;
-}
-
-function draw(timestamp) {
-
-    gl.clearColor(1, 1, 1, 1);
-    gl.clear(gl.COLOR_BUFFER_BIT);
-
-    updateModelMatrix();
-    updateProjectionMatrix();
-    updateViewMatrix();
-
-    gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
-
-    gl.useProgram(program);
-    gl.uniformMatrix4fv(modelLoc, false, new Float32Array(modelMatrix));
-    gl.uniformMatrix4fv(projLoc, false, new Float32Array(projMatrix));
-    gl.uniformMatrix4fv(viewLoc, false, new Float32Array(viewMatrix));
-    gl.bindVertexArray(vao);
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffers.elements);
-    gl.drawElements(gl.TRIANGLES, 36, gl.UNSIGNED_SHORT, 0);
-
-    // color1-=1;
-    // if (color1 <= 0) {
-    //     color1 = 255;
-    // }
-    // color2-=2;
-    // if (color2 <= 0) {
-    //     color2 = 255;
-    // }
-    // color3-=3;
-    // if (color3 <= 0) {
-    //     color3 = 255;
-    // }
-
-    requestAnimationFrame(draw);
-}
-
-// helper functions
+// ------------------------------------------ helper functions ----------------------------------------------
 function multiplyMatrices(a, b) {
 
     var result = [];
@@ -442,10 +192,269 @@ function identityMatrix() {
         0, 0, 0, 1,
     ];
 }
+// ------------------------------------------ End of helper functions --------------------------------------------
 
 
+// ------------------------------------------Start of graphics pipeline ------------------------------------------
+var gl;
+var program;
+var vao;
+var modelLoc;
+var projLoc;
+var viewLoc;
+var modelMatrix;
+var projMatrix;
+var viewMatrix;
+var buffers;
+var dragging = null;
+var anglex = 0;
+var angley = 0;
 
-// where we actually start the program
+window.mousemove = function (event) {
+    var deltax, deltay;
+
+    // console.log(event.clientX, event.clientY, event.which);
+    if (dragging) {
+        deltax = event.clientX - dragging.clientX;
+        deltay = -(event.clientY - dragging.clientY);
+        console.log("moved: " + deltax + " " + deltay);
+
+        anglex += deltay;
+        angley -= deltax;
+
+        dragging = event;
+        event.preventDefault();
+    }
+};
+
+self.mousedown = function (event) {
+    console.log(event.clientX, event.clientY);
+    dragging = event;
+    event.preventDefault();
+};
+
+self.mouseup = function(event) {
+    dragging = null;
+}
+
+function createCube() {
+
+    var positions = [
+        // Front face
+        -1.0, -1.0, 1.0,
+        1.0, -1.0, 1.0,
+        1.0, 1.0, 1.0,
+        -1.0, 1.0, 1.0,
+
+        // Back face
+        -1.0, -1.0, -1.0,
+        -1.0, 1.0, -1.0,
+        1.0, 1.0, -1.0,
+        1.0, -1.0, -1.0,
+
+        // Top face
+        -1.0, 1.0, -1.0,
+        -1.0, 1.0, 1.0,
+        1.0, 1.0, 1.0,
+        1.0, 1.0, -1.0,
+
+        // Bottom face
+        -1.0, -1.0, -1.0,
+        1.0, -1.0, -1.0,
+        1.0, -1.0, 1.0,
+        -1.0, -1.0, 1.0,
+
+        // Right face
+        1.0, -1.0, -1.0,
+        1.0, 1.0, -1.0,
+        1.0, 1.0, 1.0,
+        1.0, -1.0, 1.0,
+
+        // Left face
+        -1.0, -1.0, -1.0,
+        -1.0, -1.0, 1.0,
+        -1.0, 1.0, 1.0,
+        -1.0, 1.0, -1.0
+    ];
+
+    // added 
+    var colorsOfFaces = [
+        [0.3, 1.0, 1.0, 1.0],    // Front face: cyan
+        [1.0, 0.3, 0.3, 1.0],    // Back face: red
+        [0.3, 1.0, 0.3, 1.0],    // Top face: green
+        [0.3, 0.3, 1.0, 1.0],    // Bottom face: blue
+        [1.0, 1.0, 0.3, 1.0],    // Right face: yellow
+        [1.0, 0.3, 1.0, 1.0]     // Left face: purple
+    ];
+
+    var colors = [];
+
+    for (var j = 0; j < 6; j++) {
+        var polygonColor = colorsOfFaces[j];
+
+        // for every vertex we need to get the color specifying it according to it's face
+        for (var i = 0; i < 4; i++) {
+            colors = colors.concat(polygonColor);
+        }
+    }
+
+    
+
+    var elements = [
+        0, 1, 2, 0, 2, 3,    // front
+        4, 5, 6, 4, 6, 7,    // back
+        8, 9, 10, 8, 10, 11,   // top
+        12, 13, 14, 12, 14, 15,   // bottom
+        16, 17, 18, 16, 18, 19,   // right
+        20, 21, 22, 20, 22, 23    // left
+    ];
+
+    return {
+        positions: positions,
+        colors: colors,
+        elements: elements
+    }
+}
+
+function updateModelMatrix() {
+    var scale = scaleMatrix(0.5, 0.5, 0.5);
+
+    // Rotate a slight tilt
+    var rotateX = rotateXMatrix(0.01*anglex + 45.0 * Math.PI / 180.0);
+
+    // Rotate according to time
+    var rotateY = rotateYMatrix(0.01*angley + -45.0 * Math.PI / 180.0);
+
+    // Move slightly down
+    var position = translateMatrix(0, 0, -50);
+
+    // Multiply together, make sure and read them in opposite order
+    modelMatrix = multiplyArrayOfMatrices([
+        position, // step 4
+        rotateY,  // step 3
+        rotateX,  // step 2
+        scale     // step 1
+    ]);
+}
+
+function updateProjectionMatrix() {
+    var aspect = window.innerWidth / window.innerHeight;
+    projMatrix = perspectiveMatrix(45.0 * Math.PI / 180.0, aspect, 1, 500);
+    // projMatrix = orthographicMatrix(-aspect, aspect, -1, 1, 0, 500);
+}
+
+function updateViewMatrix() {
+    var now = Date.now();
+    var moveInAndOut = 5 - 50.0 * (Math.sin(now * 0.002) + 1.0) / 2.0;
+
+    var position = translateMatrix(0, 0, moveInAndOut);
+    var world2view = multiplyArrayOfMatrices([
+        position
+    ]);
+
+    viewMatrix = invertMatrix(world2view);
+
+}
+
+function createShader(type, source) {
+    var shader = gl.createShader(type);
+    gl.shaderSource(shader, source);
+    gl.compileShader(shader);
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+        var info = gl.getShaderInfoLog(shader);
+        console.log('Could not compile WebGL program:' + info);
+    }
+
+    return shader;
+}
+
+function createProgram(vertexShader, fragmentShader) {
+    var program = gl.createProgram();
+
+    gl.attachShader(program, vertexShader);
+    gl.attachShader(program, fragmentShader);
+    gl.linkProgram(program);
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+        var info = gl.getProgramInfoLog(program);
+        console.log('Could not compile WebGL program:' + info);
+    }
+
+    return program;
+}
+
+function createBuffers(triangles) {
+    var posBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, posBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(triangles['positions']), gl.STATIC_DRAW);
+
+    var colorBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(triangles['colors']), gl.STATIC_DRAW);
+
+    var elemBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, elemBuffer);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(triangles['elements']), gl.STATIC_DRAW);
+
+    return { 'positions': posBuffer, 'colors': colorBuffer, 'elements': elemBuffer };
+}
+
+function createVAO(posAttribLoc, colorAttribLoc, buffers) {
+
+    var vao = gl.createVertexArray();
+
+    gl.bindVertexArray(vao);
+    gl.enableVertexAttribArray(posAttribLoc);
+    var size = 3; // number of components per attribute
+    var type = gl.FLOAT;
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffers['positions']);
+    gl.vertexAttribPointer(posAttribLoc, size, type, false, 0, 0);
+
+    gl.enableVertexAttribArray(colorAttribLoc);
+    size = 4;
+    type = gl.FLOAT;
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffers['colors']);
+    gl.vertexAttribPointer(colorAttribLoc, size, type, false, 0, 0);
+
+    return vao;
+}
+
+function draw(timestamp) {
+
+    gl.clearColor(1, 1, 1, 1);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+
+    gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+
+    gl.useProgram(program);
+
+    updateModelMatrix();
+    updateProjectionMatrix();
+    updateViewMatrix();    
+    gl.uniformMatrix4fv(modelLoc, false, new Float32Array(modelMatrix));
+    gl.uniformMatrix4fv(projLoc, false, new Float32Array(projMatrix));
+    gl.uniformMatrix4fv(viewLoc, false, new Float32Array(viewMatrix));
+
+    gl.bindVertexArray(vao);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffers.elements);
+    gl.drawElements(gl.TRIANGLES, 36, gl.UNSIGNED_SHORT, 0);
+
+    // color1-=1;
+    // if (color1 <= 0) {
+    //     color1 = 255;
+    // }
+    // color2-=2;
+    // if (color2 <= 0) {
+    //     color2 = 255;
+    // }
+    // color3-=3;
+    // if (color3 <= 0) {
+    //     color3 = 255;
+    // }
+
+    requestAnimationFrame(draw);
+}
+
+
 function initialize() {
     var canvas = document.querySelector("#glcanvas");
     canvas.width = canvas.clientWidth;
@@ -457,7 +466,7 @@ function initialize() {
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
     gl.enable(gl.CULL_FACE);
-    gl.cullFace(gl.BACK);
+    gl.cullFace(gl.FRONT);
 
     var triangles = createCube();
 
