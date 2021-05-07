@@ -1,5 +1,3 @@
-# STILL WORK IN PROGRESS, Adding Interactive Mouse functionality to spin and move cube!!!
-
 # WebGL-Cube
 Toy program which plays around with transformations in relation to rendering a simple cube.
 
